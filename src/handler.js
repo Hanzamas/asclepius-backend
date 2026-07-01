@@ -11,8 +11,16 @@ const { storeData, getAllData } = require('./storeData');
  * Tidak perlu normalisasi manual karena model sudah include rescaling layer
  */
 const preprocessImage = (imageBuffer) => {
-  // Decode gambar dari buffer → tensor [H, W, 3]
-  const tensor = tf.node.decodeImage(imageBuffer, 3);
+  // Decode tanpa memaksa channel — supaya bisa validasi format gambar
+  const tensor = tf.node.decodeImage(imageBuffer);
+
+  // Validasi: hanya terima gambar RGB (3 channel)
+  // Grayscale (1 channel) atau format aneh → throw → 400
+  const channels = tensor.shape[2];
+  if (channels !== 3) {
+    tensor.dispose();
+    throw new Error(`Invalid image: expected 3 channels (RGB), got ${channels}`);
+  }
 
   // Resize ke 224x224
   const resized = tf.image.resizeBilinear(tensor, [224, 224]);
@@ -30,6 +38,7 @@ const preprocessImage = (imageBuffer) => {
 
   return batched;
 };
+
 
 /**
  * POST /predict
