@@ -21,12 +21,25 @@ const downloadModelFromGCS = async () => {
     fs.mkdirSync(tmpDir, { recursive: true });
   }
 
-  console.log(`[loadModel] Downloading model from gs://${BUCKET_NAME}/${MODEL_PREFIX}/ to ${tmpDir}`);
+  // Coba prefix 'models/' dulu, fallback ke root bucket
+  let files = [];
+  const prefixes = [MODEL_PREFIX + '/', ''];
 
-  const [files] = await bucket.getFiles({ prefix: MODEL_PREFIX + '/' });
+  for (const prefix of prefixes) {
+    console.log(`[loadModel] Trying prefix: "${prefix || '(root)'}"`);
+    const [result] = await bucket.getFiles({ prefix });
+    const modelFiles = result.filter(f =>
+      f.name.endsWith('.json') || f.name.endsWith('.bin')
+    );
+    if (modelFiles.length > 0) {
+      files = modelFiles;
+      console.log(`[loadModel] Found ${files.length} model files with prefix "${prefix || '(root)'}"`);
+      break;
+    }
+  }
 
   if (files.length === 0) {
-    throw new Error(`No files found in gs://${BUCKET_NAME}/${MODEL_PREFIX}/`);
+    throw new Error(`No model files found in bucket: ${BUCKET_NAME}`);
   }
 
   for (const file of files) {
@@ -39,6 +52,7 @@ const downloadModelFromGCS = async () => {
   console.log(`[loadModel] ✅ All model files downloaded!`);
   return `file://${tmpDir}/model.json`;
 };
+
 
 const loadModel = async () => {
   try {
