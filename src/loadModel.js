@@ -1,36 +1,54 @@
 'use strict';
 
 const tf = require('@tensorflow/tfjs-node');
+const { Storage } = require('@google-cloud/storage');
+const path = require('path');
+const fs = require('fs');
 
 const BUCKET_NAME = process.env.MODEL_BUCKET || 'submissionmlgc-hilmibisri-model';
-const MODEL_PATH = process.env.MODEL_PATH || 'models/model.json';
+const MODEL_PREFIX = process.env.MODEL_PATH
+  ? path.dirname(process.env.MODEL_PATH)
+  : 'models';
 
 let model = null;
 
+const downloadModelFromGCS = async () => {
+  const storage = new Storage();
+  const bucket = storage.bucket(BUCKET_NAME);
+  const tmpDir = '/tmp/model';
+
+  if (!fs.existsSync(tmpDir)) {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  }
+
+  console.log(`[loadModel] Downloading model from gs://${BUCKET_NAME}/${MODEL_PREFIX}/ to ${tmpDir}`);
+
+  const [files] = await bucket.getFiles({ prefix: MODEL_PREFIX + '/' });
+
+  if (files.length === 0) {
+    throw new Error(`No files found in gs://${BUCKET_NAME}/${MODEL_PREFIX}/`);
+  }
+
+  for (const file of files) {
+    const filename = path.basename(file.name);
+    const dest = path.join(tmpDir, filename);
+    console.log(`[loadModel] Downloading: ${file.name} -> ${dest}`);
+    await file.download({ destination: dest });
+  }
+
+  console.log(`[loadModel] ✅ All model files downloaded!`);
+  return `file://${tmpDir}/model.json`;
+};
+
 const loadModel = async () => {
-  const gcsPath = `gs://${BUCKET_NAME}/${MODEL_PATH}`;
-  console.log(`[loadModel] Loading model from: ${gcsPath}`);
-  console.log(`[loadModel] PROJECT: ${process.env.GOOGLE_CLOUD_PROJECT}`);
-
   try {
-    model = await tf.loadGraphModel(gcsPath);
-    console.log('[loadModel] ✅ Model loaded from GCS successfully!');
-    console.log('[loadModel] Input shape:', model.inputs[0]?.shape);
+    const localModelPath = await downloadModelFromGCS();
+    console.log(`[loadModel] Loading model from: ${localModelPath}`);
+    model = await tf.loadGraphModel(localModelPath);
+    console.log('[loadModel] ✅ Model loaded successfully!');
   } catch (err) {
-    console.error('[loadModel] ❌ Failed to load from GCS:', err.message);
-
-    // Fallback ke local model
-    const path = require('path');
-    const localPath = `file://${path.join(__dirname, '../model/model.json')}`;
-    console.log(`[loadModel] Trying local fallback: ${localPath}`);
-
-    try {
-      model = await tf.loadGraphModel(localPath);
-      console.log('[loadModel] ✅ Model loaded from local!');
-    } catch (localErr) {
-      console.error('[loadModel] ❌ Local fallback also failed:', localErr.message);
-      throw new Error('Cannot load model from GCS or local: ' + localErr.message);
-    }
+    console.error('[loadModel] ❌ Failed to load model:', err.message);
+    throw err;
   }
 
   return model;
