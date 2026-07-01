@@ -1,7 +1,13 @@
-# Build stage
-FROM node:18-slim
+FROM node:18
 
 WORKDIR /app
+
+# Install build dependencies untuk @tensorflow/tfjs-node
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
@@ -11,9 +17,6 @@ RUN npm install --omit=dev
 
 # Copy source code
 COPY . .
-
-# Copy model lokal (jika tidak pakai GCS)
-# COPY model/ ./model/
 
 # Expose port
 EXPOSE 3000
