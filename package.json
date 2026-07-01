@@ -1,0 +1,23 @@
+{
+  "name": "asclepius-backend",
+  "version": "1.0.0",
+  "description": "Asclepius - Skin Cancer Detection API Backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.3.0",
+    "@google-cloud/storage": "^7.7.0",
+    "@hapi/hapi": "^21.3.2",
+    "@tensorflow/tfjs-node": "3.21.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.16"
+  }
+}
